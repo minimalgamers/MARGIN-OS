@@ -235,14 +235,14 @@ function App(){
   const [periodo,setPeriodo]=useState("mese");const [dateFrom,setDateFrom]=useState("");const [dateTo,setDateTo]=useState("");
   const [adsLog,setAdsLog]=useState([]);
   const [adsDate,setAdsDate]=useState(new Date().toISOString().slice(0,10));
-  const [adsTiktok,setAdsTiktok]=useState(0);const [adsMeta,setAdsMeta]=useState(0);
+  const [adsTiktok,setAdsTiktok]=useState("");const [adsMeta,setAdsMeta]=useState("");
   const [speseLog,setSpeseLog]=useState([]);
   const [spData,setSpData]=useState(new Date().toISOString().slice(0,10));
-  const [spDesc,setSpDesc]=useState("");const [spImporto,setSpImporto]=useState(0);const [spIva,setSpIva]=useState(true);
+  const [spDesc,setSpDesc]=useState("");const [spImporto,setSpImporto]=useState("");const [spIva,setSpIva]=useState(true);
   const [manualOrders,setManualOrders]=useState([]);
   const [moData,setMoData]=useState(new Date().toISOString().slice(0,10));
-  const [moDesc,setMoDesc]=useState("");const [moIncasso,setMoIncasso]=useState(0);const [moIvaV,setMoIvaV]=useState(22);
-  const [moCosto,setMoCosto]=useState(0);const [moCpu,setMoCpu]=useState(0);
+  const [moDesc,setMoDesc]=useState("");const [moIncasso,setMoIncasso]=useState("");const [moIvaV,setMoIvaV]=useState(22);
+  const [moCosto,setMoCosto]=useState("");const [moCpu,setMoCpu]=useState("");
   const [syncSt,setSyncSt]=useState(null);const [syncing,setSyncing]=useState(false);
 
   // Shopify Sync
@@ -323,6 +323,27 @@ function App(){
   useEffect(()=>{if(!loading)sav("mg-abbon",abbon);},[abbon,loading]);
   useEffect(()=>{if(!loading)sav("mg-usd",usdRate);},[usdRate,loading]);
 
+  // Auto-sync: quando l'app finisce di caricare, sincronizza in background da Shopify
+  const [autoSynced,setAutoSynced]=useState(false);
+  useEffect(function(){
+    if(loading||autoSynced)return;
+    setAutoSynced(true);
+    // Prova a sincronizzare da Shopify (silenzioso, senza errori visibili)
+    fetch("/api/orders?limit=250").then(function(r){
+      if(!r.ok)return null;
+      return r.json();
+    }).then(function(data){
+      if(!data||!data.orders||!data.orders.length)return;
+      setAnaList(function(prev){
+        const existing=new Set(prev.map(function(a){return a.on;}));
+        const fresh=data.orders.filter(function(o){return !existing.has(o.on);});
+        if(fresh.length===0)return prev;
+        const newAna=fresh.map(function(o){return analyze(o,vars,accs,custs,builds);});
+        return[...newAna,...prev];
+      });
+    }).catch(function(){/* silenzioso — su Claude artifact non c'è l'API */});
+  },[loading,autoSynced]);
+
   // Filtro per data
   const oggi=new Date().toISOString().slice(0,10);
   const getDateRange=(p)=>{
@@ -343,17 +364,19 @@ function App(){
   // ADS functions
   const saveAds=()=>{
     if(!adsDate)return;
+    const tk=parseFloat(adsTiktok)||0, mt=parseFloat(adsMeta)||0;
+    if(tk===0&&mt===0)return;
     setAdsLog(prev=>{const existing=prev.findIndex(e=>e.date===adsDate);
-      if(existing>=0){const n=[...prev];n[existing]={date:adsDate,tiktok:adsTiktok,meta:adsMeta};return n;}
-      return[...prev,{date:adsDate,tiktok:adsTiktok,meta:adsMeta}].sort((a,b)=>b.date.localeCompare(a.date));});
-    setAdsTiktok(0);setAdsMeta(0);
+      if(existing>=0){const n=[...prev];n[existing]={date:adsDate,tiktok:tk,meta:mt};return n;}
+      return[...prev,{date:adsDate,tiktok:tk,meta:mt}].sort((a,b)=>b.date.localeCompare(a.date));});
+    setAdsTiktok("");setAdsMeta("");
   };
   const deleteAds=(date)=>setAdsLog(prev=>prev.filter(e=>e.date!==date));
   // Spese extra
-  const saveSpesa=()=>{if(!spDesc.trim()||!spImporto)return;setSpeseLog(prev=>[{date:spData,desc:spDesc,importo:spImporto,iva:spIva},...prev]);setSpDesc("");setSpImporto(0);};
+  const saveSpesa=()=>{const imp=parseFloat(spImporto)||0;if(!spDesc.trim()||!imp)return;setSpeseLog(prev=>[{date:spData,desc:spDesc,importo:imp,iva:spIva},...prev]);setSpDesc("");setSpImporto("");};
   const deleteSpesa=i=>setSpeseLog(prev=>prev.filter((_,j)=>j!==i));
   // Ordini manuali
-  const saveManual=()=>{if(!moDesc.trim()||!moIncasso)return;setManualOrders(prev=>[{date:moData,desc:moDesc,incasso:moIncasso,ivaV:moIvaV,costo:moCosto,cpu17:moCpu},...prev]);setMoDesc("");setMoIncasso(0);setMoCosto(0);setMoCpu(0);};
+  const saveManual=()=>{const inc=parseFloat(moIncasso)||0;if(!moDesc.trim()||!inc)return;setManualOrders(prev=>[{date:moData,desc:moDesc,incasso:inc,ivaV:moIvaV,costo:parseFloat(moCosto)||0,cpu17:parseFloat(moCpu)||0},...prev]);setMoDesc("");setMoIncasso("");setMoCosto("");setMoCpu("");};
   const deleteManual=i=>setManualOrders(prev=>prev.filter((_,j)=>j!==i));
 
   // ADS filtered by period
@@ -521,11 +544,11 @@ function App(){
           <div><label className="text-[10px] text-zinc-500 block mb-1">Data</label>
             <input type="date" value={adsDate} onChange={e=>setAdsDate(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-emerald-600"/></div>
           <div><label className="text-[10px] text-pink-400 block mb-1">TikTok (€)</label>
-            <input type="number" step="0.01" value={adsTiktok||""} onChange={e=>setAdsTiktok(parseFloat(e.target.value)||0)} placeholder="0" className="w-24 bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-right text-zinc-300 focus:outline-none focus:border-pink-500"/></div>
+            <input type="number" step="0.01" value={adsTiktok} onChange={e=>setAdsTiktok(e.target.value)} placeholder="0" className="w-24 bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-right text-zinc-300 focus:outline-none focus:border-pink-500"/></div>
           <div><label className="text-[10px] text-indigo-400 block mb-1">Meta (€)</label>
-            <input type="number" step="0.01" value={adsMeta||""} onChange={e=>setAdsMeta(parseFloat(e.target.value)||0)} placeholder="0" className="w-24 bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-right text-zinc-300 focus:outline-none focus:border-indigo-500"/></div>
+            <input type="number" step="0.01" value={adsMeta} onChange={e=>setAdsMeta(e.target.value)} placeholder="0" className="w-24 bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-xs text-right text-zinc-300 focus:outline-none focus:border-indigo-500"/></div>
           <button onClick={saveAds} className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 rounded text-xs font-semibold transition">✓ Salva</button>
-          {(adsTiktok>0||adsMeta>0)&&<span className="text-[10px] text-zinc-500">Totale: {fmt(adsTiktok+adsMeta)}</span>}
+          {(parseFloat(adsTiktok)>0||parseFloat(adsMeta)>0)&&<span className="text-[10px] text-zinc-500">Totale: {fmt((parseFloat(adsTiktok)||0)+(parseFloat(adsMeta)||0))}</span>}
         </div>
         {filteredAds.length>0&&<div className="mt-3 overflow-x-auto"><table className="w-full text-[11px]"><thead><tr className="border-b border-zinc-800 text-zinc-500 uppercase text-[9px]">
           <th className="p-1.5 w-6"></th><th className="text-left p-1.5">Data</th><th className="text-right p-1.5 text-pink-400">TikTok</th><th className="text-right p-1.5 text-indigo-400">Meta</th><th className="text-right p-1.5">Totale</th>
@@ -549,7 +572,7 @@ function App(){
           <div className="flex items-end gap-2 flex-wrap">
             <div><label className="text-[10px] text-zinc-500 block mb-1">Data</label><input type="date" value={spData} onChange={e=>setSpData(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300 focus:outline-none focus:border-emerald-600"/></div>
             <div className="flex-1 min-w-[100px]"><label className="text-[10px] text-zinc-500 block mb-1">Descrizione</label><input value={spDesc} onChange={e=>setSpDesc(e.target.value)} placeholder="es. Pasta termica" className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300 focus:outline-none focus:border-emerald-600"/></div>
-            <div><label className="text-[10px] text-zinc-500 block mb-1">Importo (€)</label><input type="number" step="0.01" value={spImporto||""} onChange={e=>setSpImporto(parseFloat(e.target.value)||0)} className="w-20 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-right text-zinc-300 focus:outline-none focus:border-emerald-600"/></div>
+            <div><label className="text-[10px] text-zinc-500 block mb-1">Importo (€)</label><input type="number" step="0.01" value={spImporto} onChange={e=>setSpImporto(e.target.value)} className="w-20 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-right text-zinc-300 focus:outline-none focus:border-emerald-600"/></div>
             <div><label className="text-[10px] text-zinc-500 block mb-1">IVA</label><select value={spIva?"si":"no"} onChange={e=>setSpIva(e.target.value==="si")} className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300"><option value="si">Con IVA</option><option value="no">Senza IVA</option></select></div>
             <button onClick={saveSpesa} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-xs font-semibold transition">✓</button>
           </div>
@@ -568,13 +591,13 @@ function App(){
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
             <div><label className="text-[10px] text-zinc-500 block mb-1">Data</label><input type="date" value={moData} onChange={e=>setMoData(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300 focus:outline-none focus:border-emerald-600"/></div>
             <div className="col-span-2 md:col-span-3"><label className="text-[10px] text-zinc-500 block mb-1">Cliente / Descrizione</label><input value={moDesc} onChange={e=>setMoDesc(e.target.value)} placeholder="es. Mario Rossi - BLACKNOVA custom" className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300 focus:outline-none focus:border-emerald-600"/></div>
-            <div><label className="text-[10px] text-purple-400 block mb-1">Incasso totale (€ IVA incl.)</label><input type="number" step="0.01" value={moIncasso||""} onChange={e=>setMoIncasso(parseFloat(e.target.value)||0)} className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-right text-zinc-300 focus:outline-none focus:border-purple-500"/></div>
+            <div><label className="text-[10px] text-purple-400 block mb-1">Incasso totale (€ IVA incl.)</label><input type="number" step="0.01" value={moIncasso} onChange={e=>setMoIncasso(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-right text-zinc-300 focus:outline-none focus:border-purple-500"/></div>
             <div><label className="text-[10px] text-purple-400 block mb-1">IVA vendita</label><select value={moIvaV} onChange={e=>setMoIvaV(parseInt(e.target.value))} className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300"><option value={22}>22% (standard)</option><option value={4}>4% (agevolazione INPS)</option></select></div>
-            <div><label className="text-[10px] text-yellow-400 block mb-1">Costo prodotto (€ IVA 22% incl.)</label><input type="number" step="0.01" value={moCosto||""} onChange={e=>setMoCosto(parseFloat(e.target.value)||0)} className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-right text-zinc-300 focus:outline-none focus:border-yellow-500"/></div>
-            <div><label className="text-[10px] text-amber-400 block mb-1">CPU Art.17 (€)</label><input type="number" step="0.01" value={moCpu||""} onChange={e=>setMoCpu(parseFloat(e.target.value)||0)} className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-right text-zinc-300 focus:outline-none focus:border-amber-500"/></div>
+            <div><label className="text-[10px] text-yellow-400 block mb-1">Costo prodotto (€ IVA 22% incl.)</label><input type="number" step="0.01" value={moCosto} onChange={e=>setMoCosto(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-right text-zinc-300 focus:outline-none focus:border-yellow-500"/></div>
+            <div><label className="text-[10px] text-amber-400 block mb-1">CPU Art.17 (€)</label><input type="number" step="0.01" value={moCpu} onChange={e=>setMoCpu(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-right text-zinc-300 focus:outline-none focus:border-amber-500"/></div>
             <div className="flex items-end"><button onClick={saveManual} className="w-full px-3 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-xs font-semibold transition">✓ Salva Ordine</button></div>
           </div>
-          {moIncasso>0&&<div className="mt-2 text-[10px] text-zinc-500">Anteprima: incasso netto {fmt(moIncasso/(1+moIvaV/100))} · costo netto {fmt(moCosto/1.22)} · no commissioni · +DHL €{S.ship}</div>}
+          {parseFloat(moIncasso)>0&&<div className="mt-2 text-[10px] text-zinc-500">Anteprima: incasso netto {fmt(parseFloat(moIncasso)/(1+moIvaV/100))} · costo netto {fmt(parseFloat(moCosto)/1.22)} · no commissioni · +DHL €{S.ship}</div>}
           {filteredManual.length>0?<div className="mt-3 overflow-x-auto"><table className="w-full text-[11px]"><thead><tr className="border-b border-zinc-800 text-zinc-500 uppercase text-[9px]">
             <th className="p-1 w-5"></th><th className="text-left p-1">Data</th><th className="text-left p-1">Descrizione</th><th className="text-right p-1">Incasso</th><th className="p-1">IVA</th><th className="text-right p-1">Costo</th><th className="text-right p-1">CPU17</th>
           </tr></thead><tbody>{filteredManual.map((m,i)=><tr key={i} className="border-b border-zinc-800/30 group">
