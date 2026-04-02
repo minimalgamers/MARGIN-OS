@@ -152,13 +152,34 @@ function analyze(o,vars,accs,custs,builds){
   let bb=null,cb=null,liq=false,ass=false,tc=0,cpu17=0;
   for(const li of o.li){const n=li.n,p=li.p,nn=N(n);
     if(nn.includes("TV")&&nn.includes("POLLICI")){r.items.push({ty:"eccezione",raw:n,sp:p,ic:null,dc:null,bc:null,mg:null,ep:p,mt:"ECCEZIONE MANUALE",lg:"—",cf:"manuale"});r.anom.push({ty:"eccezione_manuale",it:n,sv:"medio"});continue;}
-    const isCT=nn.startsWith("CUSTOM")||(nn.includes("PC GAMING")&&nn.includes("CUSTOM"));
+    // Build base — prova PRIMA del custom
+    if(!bb&&!cb&&(nn.includes("PC GAMING")||nn.includes("PC "))){
+      let bm=null,bestScore=0;
+      const isBundle=nn.includes("MONITOR")&&nn.includes("KIT");
+      for(const b of builds){
+        const bn=N(b.n);
+        let sc=0;
+        // Match esatto nome nel titolo (es. "BLACKNOVA" nel titolo)
+        if(nn.includes(bn))sc+=10+bn.length;
+        // Match per parole chiave del nome build
+        else{const bw=bn.split(/\s+/).filter(w=>w.length>2);const hits=bw.filter(w=>nn.includes(w)).length;if(bw.length>0)sc+=hits*3;}
+        // Bonus prezzo esatto
+        if(b.p===p)sc+=20;
+        // Bonus/penalità bundle: se il titolo è un bundle, preferisci build con PC+MONITOR+KIT nel nome
+        const isBuildBundle=bn.includes("MONITOR")&&bn.includes("KIT");
+        if(isBundle&&isBuildBundle)sc+=15;
+        if(isBundle&&!isBuildBundle)sc-=10;
+        if(!isBundle&&isBuildBundle)sc-=10;
+        if(sc>bestScore){bestScore=sc;bm=b;}
+      }
+      if(bm&&bestScore>=10){bb=bm;r.build=bm.n;tc+=bm.c;cpu17+=bm.cpu;r.items.push({ty:"build",raw:n,sp:p,ic:bm.c,dc:null,bc:null,mg:null,ep:p,mt:bm.n,lg:"—",cf:"alto"});continue;}
+    }
+    // Custom build — solo se titolo inizia con [CUSTOM] e non ha matchato nessuna build base
+    const isCT=nn.startsWith("CUSTOM")||(nn.includes("PC GAMING")&&nn.includes("CUSTOM")&&!bb);
     if(isCT&&!n.match(/^(CASE|MOTHERBOARD|SCHEDA MADRE|SCHEDA VIDEO|DISSIPATORE|COOLER|RAM|SSD|GPU|CPU|ARCHIVIAZIONE)/i)){
       let cm=null;for(const c of custs){const cn=N(c.sm),ts=cn.split(/\s+/).filter(t=>t.length>3);let m=0;for(const t of ts)if(nn.includes(t))m++;if(m/ts.length>0.35)cm=c;}
       if(cm){cb=cm;r.isCust=true;r.cust=cm.inn;if(cm.at==="LIQUIDO")liq=true;if(cm.at==="ASSASSIN")ass=true;tc+=cm.tc;cpu17+=cm.a17?cm.ca:0;r.items.push({ty:"custom",raw:n,sp:p,ic:cm.tc,dc:null,bc:null,mg:null,ep:p,mt:cm.inn,lg:"—",cf:"alto"});continue;}
       r.items.push({ty:"sconosciuto",raw:n,sp:p,ic:null,dc:null,bc:null,mg:null,ep:p,mt:null,lg:"—",cf:"nessuno"});r.anom.push({ty:"custom_sconosciuto",it:n,sv:"alto"});r.st="parziale";continue;}
-    if(!bb&&(nn.includes("PC GAMING")||nn.includes("PC "))){let bm=null,bl=0;for(const b of builds){const bn=N(b.n);if(nn.includes(bn)&&bn.length>bl){bm=b;bl=bn.length;}}
-      if(bm){bb=bm;r.build=bm.n;tc+=bm.c;cpu17+=bm.cpu;r.items.push({ty:"build",raw:n,sp:p,ic:bm.c,dc:null,bc:null,mg:null,ep:p,mt:bm.n,lg:"—",cf:"alto"});continue;}}
     const vp=n.match(/^(CASE|MOTHERBOARD|SCHEDA MADRE|SCHEDA VIDEO|DISSIPATORE|COOLER|RAM E ARCHIVIAZIONE|ARCHIVIAZIONE AGGIUNTIVA|ARCHIVIAZIONE|RAM|SSD|GPU|CPU)\s*-/i);
     if(vp){const ctx=bb?.n||cb?.inn||"";const isCustCtx=!!cb;const dash=n.indexOf(" - ");const oType=N(dash>0?n.substring(0,dash):"");const oVal=dash>0?n.substring(dash+3).trim():"";
       let bv=null,bs=0;
