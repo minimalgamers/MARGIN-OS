@@ -263,6 +263,22 @@ function App(){
     }catch(e){setSyncSt({ok:false,msg:"Errore: "+e.message});}
     setSyncing(false);
   };
+  // Ri-sincronizza tutto: cancella ordini vecchi e riscarica da Shopify
+  const resyncAll=async()=>{
+    if(!confirm("Cancellare tutti gli ordini e ri-sincronizzare da Shopify?\n\nI dati ADS, spese extra e ordini manuali NON verranno cancellati."))return;
+    setSyncing(true);setSyncSt(null);
+    try{
+      const pwd=localStorage.getItem("mg-pwd")||"";
+      const r=await fetch("/api/orders?limit=250",{headers:pwd?{"Authorization":`Bearer ${pwd}`}:{}});
+      if(!r.ok){const e=await r.json();throw new Error(e.error||`HTTP ${r.status}`);}
+      const data=await r.json();
+      if(!data.orders||!data.orders.length){setAnaList([]);setSyncSt({ok:true,msg:"Ordini cancellati. Nessun ordine trovato su Shopify."});setSyncing(false);return;}
+      const newAna=data.orders.map(o=>analyze(o,vars,accs,custs,builds));
+      setAnaList(newAna);
+      setSyncSt({ok:true,msg:`✓ Tutti gli ordini ri-analizzati da zero: ${newAna.length} ordini caricati`});
+    }catch(e){setSyncSt({ok:false,msg:"Errore: "+e.message});}
+    setSyncing(false);
+  };
 
   // ═══ PERSISTENT STORAGE (localStorage) ═══
   const sav=async(k,d)=>{try{localStorage.setItem(k,JSON.stringify(d));}catch(e){}};
@@ -603,12 +619,18 @@ function App(){
       {sel.anom.length>0&&<div className="rounded-lg border border-amber-800/40 bg-amber-900/10 p-3"><h3 className="text-[10px] font-bold text-amber-400 uppercase mb-2">Anomalie</h3>{sel.anom.map((a,i)=><div key={i} className="flex items-start gap-2 mb-1.5 text-xs"><Badge text={a.sv} color={a.sv==="critico"||a.sv==="alto"?"red":"amber"}/><div><div className="text-zinc-300">{a.ty.replace(/_/g," ")}</div><div className="text-[10px] text-zinc-500">{a.it}</div></div></div>)}</div>}</>}
 
     {pg==="import"&&<><h1 className="text-lg font-bold mt-2">Sincronizza Ordini</h1>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div className="rounded-xl border-2 border-emerald-800/40 bg-emerald-900/10 p-6 text-center">
           <div className="text-emerald-400 text-3xl mb-3">⚡</div>
           <div className="text-sm font-semibold text-emerald-300 mb-2">Sincronizza da Shopify</div>
-          <div className="text-[10px] text-zinc-500 mb-4">Recupera automaticamente tutti gli ordini via API</div>
+          <div className="text-[10px] text-zinc-500 mb-4">Aggiunge solo i nuovi ordini</div>
           <button onClick={syncShopify} disabled={syncing} className={`px-6 py-2 rounded text-xs font-bold transition ${syncing?"bg-zinc-700 text-zinc-400 cursor-wait":"bg-emerald-600 hover:bg-emerald-500 text-white"}`}>{syncing?"Sincronizzazione...":"⟳ Sincronizza Ordini"}</button>
+        </div>
+        <div className="rounded-xl border-2 border-amber-800/40 bg-amber-900/10 p-6 text-center">
+          <div className="text-amber-400 text-3xl mb-3">🔄</div>
+          <div className="text-sm font-semibold text-amber-300 mb-2">Ri-sincronizza Tutto</div>
+          <div className="text-[10px] text-zinc-500 mb-4">Cancella e riscarica tutti gli ordini da zero</div>
+          <button onClick={resyncAll} disabled={syncing} className={`px-6 py-2 rounded text-xs font-bold transition ${syncing?"bg-zinc-700 text-zinc-400 cursor-wait":"bg-amber-600 hover:bg-amber-500 text-white"}`}>{syncing?"Sincronizzazione...":"🔄 Ri-sincronizza Tutto"}</button>
         </div>
         <div className="rounded-xl border-2 border-dashed border-zinc-700 hover:border-zinc-500 bg-zinc-900/50 p-6 text-center transition-all cursor-pointer" onClick={()=>document.getElementById("csv-up").click()}>
           <input id="csv-up" type="file" accept=".csv" className="hidden" onChange={e=>{const f=e.target.files?.[0];if(f){setUploadSt(null);handleUpload(f);}e.target.value="";}}/>
