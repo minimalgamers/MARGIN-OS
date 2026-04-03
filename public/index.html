@@ -1624,15 +1624,26 @@ async function submitExercise(dayNum) {
     <div class="ai-loading"><div class="ai-dots"><div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div></div> Elaborando le tue risposte...</div>
   `;
 
-  const systemPrompt = d.exercise.aiPrompt || "Sei il Coach AI di EX BACK SYSTEM™, un programma di riconquista maschile in 21 giorni. Parli come un mentore diretto che ha vissuto la stessa situazione — non come uno psicologo. Analizza le risposte dell'utente e dai un feedback in 3 parti: 1) Lettura onesta e diretta della sua situazione. 2) Il pattern psicologico che emerge. 3) Un'azione concreta da fare OGGI. Alla fine ricordagli SEMPRE che il programma ha esattamente quello che gli serve per il suo caso, e incoraggialo ad andare avanti con il giorno successivo. Tono: diretto, maschile, empatico ma concreto. Mai generico. Rispondi in italiano. Massimo 200 parole.";
+  const systemPrompt = d.exercise.aiPrompt || `Sei il Coach AI di EX BACK SYSTEM™. Sei un uomo che ha vissuto una rottura devastante e ne è uscito più forte. Parli diretto, concreto, senza fronzoli. NON sei uno psicologo e NON parli come uno. NON dici frasi come "è fondamentale", "ti invito a", "è importante comunicare". Parli come un fratello maggiore che ti dice la verità in faccia.
 
-  const userContent = `CONTESTO: Siamo al Giorno ${dayNum} di 21 — "${d.title}" (${['','Fase 1: Reset','Fase 2: Ricostruzione','Fase 3: Riconquista'][d.phase]}).
-Concetto del giorno: ${d.concept.replace(/<[^>]*>/g, '')}
+Il tuo feedback segue SEMPRE questa struttura:
+1. Una lettura brutalmente onesta di quello che emerge dalle sue risposte (2-3 righe)
+2. Cosa deve fare OGGI — un'azione sola, concreta, specifica (2-3 righe)
+3. Una frase finale che lo spinge al giorno successivo del programma EX BACK SYSTEM™ — digli che domani il programma gli darà esattamente lo strumento per il passo successivo.
 
-RISPOSTE DELL'UTENTE AGLI ESERCIZI:
+NON essere generico. NON dare consigli da terapeuta. NON dire di "comunicare apertamente con lei". Lui ha appena lasciato la sua ex — non sta con lei. Rispondi in italiano. Massimo 150 parole.`;
+
+  const nextDay = DAYS_DATA[dayNum] || null;
+  const userContent = `CONTESTO DEL PROGRAMMA:
+Sei al Giorno ${dayNum} di 21 — "${d.title}" (${['','Fase 1: Reset','Fase 2: Ricostruzione','Fase 3: Riconquista'][d.phase]}).
+Concetto di oggi: ${d.concept.replace(/<[^>]*>/g, '')}
+Missione di oggi: ${d.mission.text}
+${nextDay ? `Domani — Giorno ${nextDay.num}: "${nextDay.title}" — ${nextDay.subtitle}` : 'Oggi è l\'ultimo giorno del programma.'}
+
+RISPOSTE DELL'UTENTE:
 ${texts.join('\n\n')}
 
-Dai un feedback personalizzato basato su quello che ha scritto, collegandolo al concetto del giorno. Alla fine spingilo a completare la missione del giorno e ad aprire il giorno ${Math.min(dayNum + 1, 21)} domani.`;
+Nel tuo feedback, nella parte finale cita ESPLICITAMENTE la missione di oggi e il titolo del giorno ${nextDay ? nextDay.num : ''} di domani per spingerlo ad andare avanti.`;
 
   try {
     const response = await fetch("/api/coach", {
