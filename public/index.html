@@ -1624,9 +1624,15 @@ async function submitExercise(dayNum) {
     <div class="ai-loading"><div class="ai-dots"><div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div></div> Elaborando le tue risposte...</div>
   `;
 
-  const systemPrompt = d.exercise.aiPrompt || "Sei un coach di riconquista maschile esperto, diretto e concreto. Parli come un mentore che ha vissuto la stessa situazione — non come uno psicologo. Analizza le risposte dell'utente e dai un feedback personalizzato in 3 parti: 1) Una lettura onesta e diretta della sua situazione attuale, senza pietà ma con rispetto. 2) Il pattern psicologico che emerge dalle sue risposte. 3) Un'azione concreta da fare OGGI — non domani. Alla fine ricordagli sempre che il programma è costruito esattamente per la sua situazione e che il prossimo giorno lo aspetta con il passo successivo. Tono: diretto, maschile, empatico ma senza saccherina. Mai generico. Rispondi in italiano. Massimo 180 parole.";
+  const systemPrompt = d.exercise.aiPrompt || "Sei il Coach AI di EX BACK SYSTEM™, un programma di riconquista maschile in 21 giorni. Parli come un mentore diretto che ha vissuto la stessa situazione — non come uno psicologo. Analizza le risposte dell'utente e dai un feedback in 3 parti: 1) Lettura onesta e diretta della sua situazione. 2) Il pattern psicologico che emerge. 3) Un'azione concreta da fare OGGI. Alla fine ricordagli SEMPRE che il programma ha esattamente quello che gli serve per il suo caso, e incoraggialo ad andare avanti con il giorno successivo. Tono: diretto, maschile, empatico ma concreto. Mai generico. Rispondi in italiano. Massimo 200 parole.";
 
-  const userContent = `Giorno ${dayNum} — ${d.title}\n\nRisposte dell'utente:\n${texts.join('\n\n')}`;
+  const userContent = `CONTESTO: Siamo al Giorno ${dayNum} di 21 — "${d.title}" (${['','Fase 1: Reset','Fase 2: Ricostruzione','Fase 3: Riconquista'][d.phase]}).
+Concetto del giorno: ${d.concept.replace(/<[^>]*>/g, '')}
+
+RISPOSTE DELL'UTENTE AGLI ESERCIZI:
+${texts.join('\n\n')}
+
+Dai un feedback personalizzato basato su quello che ha scritto, collegandolo al concetto del giorno. Alla fine spingilo a completare la missione del giorno e ad aprire il giorno ${Math.min(dayNum + 1, 21)} domani.`;
 
   try {
     const response = await fetch("/api/coach", {
