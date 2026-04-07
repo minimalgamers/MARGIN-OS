@@ -296,57 +296,66 @@ function App(){
   const savLocal=function(k,d){try{localStorage.setItem(k,JSON.stringify(d));}catch(e){}};
   const ldLocal=function(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}};
 
-  // Caricamento iniziale: prova Supabase, fallback localStorage
+  // Caricamento iniziale: Supabase per strutture + localStorage per dati operativi se Supabase è vuoto
   useEffect(function(){
     let done=false;
     const load=async function(){
+      // Sempre carica localStorage come base
+      var localAds=ldLocal("mg-ads")||[];
+      var localSpese=ldLocal("mg-spese")||[];
+      var localManual=ldLocal("mg-manual")||[];
+      var localOrders=ldLocal("mg-orders")||[];
+      
       try{
-        // Prova Supabase
+        // Prova Supabase per le strutture (build, varianti, accessori, abbonamenti)
         const r=await fetch("/api/db?action=load_all",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
         if(r.ok){
           const db=await r.json();
           if(done)return;
-          // Converti dati Supabase nel formato frontend
+          // Strutture da Supabase (queste sono sempre aggiornate su Supabase)
           if(db.variants&&db.variants.length>0)setVars(db.variants.map(function(v){return{t:v.type,v:v.name,ep:parseFloat(v.extra_price)||0,l:v.logic||"S",ic:v.internal_cost!=null?parseFloat(v.internal_cost):null,bc:parseFloat(v.base_cost)||0,g:v.build_groups||"*",_id:v.id};}));
           if(db.accessories&&db.accessories.length>0)setAccs(db.accessories.map(function(a){return{k:a.key,nm:a.name,sp:parseFloat(a.sell_price)||0,ic:parseFloat(a.internal_cost)||0,_id:a.id};}));
           if(db.customBuilds&&db.customBuilds.length>0)setCusts(db.customBuilds.map(function(c){return{sm:c.shopify_match,inn:c.internal_name,a17:c.has_art17,tc:parseFloat(c.total_cost)||0,ca:parseFloat(c.cpu_art17)||0,at:c.assembly_type||"ASSASSIN",_id:c.id};}));
           if(db.builds&&db.builds.length>0)setBuilds(db.builds.map(function(b){return{n:b.name,c:parseFloat(b.cost_iva)||0,p:parseFloat(b.price)||0,cpu:parseFloat(b.cpu_art17)||0,_id:b.id};}));
-          if(db.adsLog&&db.adsLog.length>0)setAdsLog(db.adsLog.map(function(a){return{date:a.date,tiktok:parseFloat(a.tiktok)||0,meta:parseFloat(a.meta)||0,_id:a.id};}));
-          if(db.expenses&&db.expenses.length>0)setSpeseLog(db.expenses.map(function(s){return{date:s.date,desc:s.description,importo:parseFloat(s.amount)||0,iva:s.has_iva,_id:s.id};}));
-          if(db.manualOrders&&db.manualOrders.length>0)setManualOrders(db.manualOrders.map(function(m){return{date:m.date,desc:m.description,incasso:parseFloat(m.income)||0,ivaV:m.iva_rate||22,costo:parseFloat(m.product_cost)||0,cpu17:parseFloat(m.cpu_art17)||0,_id:m.id};}));
           if(db.subscriptions&&db.subscriptions.length>0)setAbbon(db.subscriptions.map(function(s){return{nome:s.name,costo:parseFloat(s.cost)||0,valuta:s.currency||"EUR",freq:s.frequency||"mese",_id:s.id};}));
           if(db.settings){
-            const usd=db.settings.find(function(s){return s.key==="usd_rate";});
+            var usd=db.settings.find(function(s){return s.key==="usd_rate";});
             if(usd)setUsdRate(parseFloat(usd.value)||0.92);
           }
-          // Ordini dalla cache Supabase
-          if(db.orders&&db.orders.length>0){
-            setAnaList(db.orders.map(function(o){return o.analysis;}));
-          }
+          // Dati operativi: Supabase se ha dati, altrimenti localStorage
+          if(db.adsLog&&db.adsLog.length>0)setAdsLog(db.adsLog.map(function(a){return{date:a.date,tiktok:parseFloat(a.tiktok)||0,meta:parseFloat(a.meta)||0,_id:a.id};}));
+          else if(localAds.length>0)setAdsLog(localAds);
+          
+          if(db.expenses&&db.expenses.length>0)setSpeseLog(db.expenses.map(function(s){return{date:s.date,desc:s.description,importo:parseFloat(s.amount)||0,iva:s.has_iva,_id:s.id};}));
+          else if(localSpese.length>0)setSpeseLog(localSpese);
+          
+          if(db.manualOrders&&db.manualOrders.length>0)setManualOrders(db.manualOrders.map(function(m){return{date:m.date,desc:m.description,incasso:parseFloat(m.income)||0,ivaV:m.iva_rate||22,costo:parseFloat(m.product_cost)||0,cpu17:parseFloat(m.cpu_art17)||0,_id:m.id};}));
+          else if(localManual.length>0)setManualOrders(localManual);
+          
+          // Ordini: dalla cache Supabase o localStorage
+          if(db.orders&&db.orders.length>0)setAnaList(db.orders.map(function(o){return o.analysis;}));
+          else if(localOrders.length>0)setAnaList(localOrders);
+          
           if(!done)setLoading(false);
           return;
         }
-      }catch(e){/* Supabase non disponibile, fallback localStorage */}
-      // Fallback: localStorage
-      try{
-        const keys=["mg-vars","mg-accs","mg-custs","mg-builds","mg-orders","mg-ads","mg-spese","mg-manual","mg-abbon","mg-usd"];
-        const results=keys.map(ldLocal);
-        if(done)return;
-        const [v,a,c,b,o,ad,sp,mo,ab,us]=results;
-        if(v&&Array.isArray(v))setVars(v);
-        if(a&&Array.isArray(a))setAccs(a);
-        if(c&&Array.isArray(c))setCusts(c);
-        if(b&&Array.isArray(b))setBuilds(b);
-        if(o&&Array.isArray(o)&&o.length>0)setAnaList(o);
-        if(ad&&Array.isArray(ad))setAdsLog(ad);
-        if(sp&&Array.isArray(sp))setSpeseLog(sp);
-        if(mo&&Array.isArray(mo))setManualOrders(mo);
-        if(ab&&Array.isArray(ab))setAbbon(ab);
-        if(us&&typeof us==="number")setUsdRate(us);
-      }catch(e){}
+      }catch(e){/* Supabase non disponibile */}
+      // Fallback completo: solo localStorage
+      if(done)return;
+      var v=ldLocal("mg-vars"),a=ldLocal("mg-accs"),c=ldLocal("mg-custs"),b=ldLocal("mg-builds"),ab=ldLocal("mg-abbon"),us=ldLocal("mg-usd");
+      if(v&&Array.isArray(v))setVars(v);
+      if(a&&Array.isArray(a))setAccs(a);
+      if(c&&Array.isArray(c))setCusts(c);
+      if(b&&Array.isArray(b))setBuilds(b);
+      if(localOrders.length>0)setAnaList(localOrders);
+      if(localAds.length>0)setAdsLog(localAds);
+      if(localSpese.length>0)setSpeseLog(localSpese);
+      if(localManual.length>0)setManualOrders(localManual);
+      if(ab&&Array.isArray(ab))setAbbon(ab);
+      if(us&&typeof us==="number")setUsdRate(us);
       if(!done)setLoading(false);
     };
-    const timer=setTimeout(function(){if(!done){done=true;setLoading(false);}},5000);
+    var timer=setTimeout(function(){if(!done){done=true;setLoading(false);}},5000);
     load().finally(function(){done=true;clearTimeout(timer);});
     return function(){done=true;clearTimeout(timer);};
   },[]);
