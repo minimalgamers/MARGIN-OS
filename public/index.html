@@ -366,21 +366,29 @@ function App(){
   useEffect(function(){if(!loading)savLocal("mg-manual",manualOrders);},[manualOrders,loading]);
   useEffect(function(){if(!loading)savLocal("mg-orders",anaList);},[anaList,loading]);
 
-  // Auto-sync Shopify
+  // Auto-sync Shopify (protetto da crash)
   const [autoSynced,setAutoSynced]=useState(false);
   useEffect(function(){
     if(loading||autoSynced)return;
     setAutoSynced(true);
-    fetchOrders().then(function(data){
-      if(!data||!data.orders||!data.orders.length)return;
-      setAnaList(function(prev){
-        const existing=new Set(prev.map(function(a){return a.on;}));
-        const fresh=data.orders.filter(function(o){return !existing.has(o.on);});
-        if(fresh.length===0)return prev;
-        const newAna=fresh.map(function(o){return analyze(o,vars,accs,custs,builds);});
-        return[...newAna,...prev];
-      });
-    }).catch(function(){});
+    try{
+      fetchOrders().then(function(data){
+        try{
+          if(!data||!data.orders||!data.orders.length)return;
+          setAnaList(function(prev){
+            var existing=new Set(prev.map(function(a){return a.on;}));
+            var fresh=data.orders.filter(function(o){return !existing.has(o.on);});
+            if(fresh.length===0)return prev;
+            var newAna=[];
+            for(var i=0;i<fresh.length;i++){
+              try{newAna.push(analyze(fresh[i],vars,accs,custs,builds));}catch(e){}
+            }
+            if(newAna.length===0)return prev;
+            return newAna.concat(prev);
+          });
+        }catch(e){console.error("Auto-sync process error:",e);}
+      }).catch(function(e){console.error("Auto-sync fetch error:",e);});
+    }catch(e){console.error("Auto-sync error:",e);}
   },[loading,autoSynced]);
 
   // Filtro per data
@@ -812,8 +820,24 @@ function App(){
     </div></div>);
 }
 
+class ErrorBoundary extends React.Component {
+  constructor(props){super(props);this.state={hasError:false,error:null};}
+  static getDerivedStateFromError(error){return{hasError:true,error:error};}
+  render(){
+    if(this.state.hasError){
+      return React.createElement("div",{style:{padding:40,color:"#fff",background:"#09090b",minHeight:"100vh"}},
+        React.createElement("h1",{style:{color:"#f43f5e",marginBottom:16}},"Errore di rendering"),
+        React.createElement("p",{style:{color:"#a1a1aa",marginBottom:16}},this.state.error&&this.state.error.toString()),
+        React.createElement("button",{onClick:function(){window.location.reload();},style:{background:"#10b981",color:"#000",padding:"8px 16px",borderRadius:8,border:"none",cursor:"pointer",fontWeight:"bold"}},"Ricarica App"),
+        React.createElement("button",{onClick:function(){localStorage.clear();window.location.reload();},style:{background:"#f59e0b",color:"#000",padding:"8px 16px",borderRadius:8,border:"none",cursor:"pointer",fontWeight:"bold",marginLeft:8}},"Reset e Ricarica")
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(React.createElement(App));
+root.render(React.createElement(ErrorBoundary,null,React.createElement(App)));
   </script>
 </body>
 </html>
