@@ -196,11 +196,11 @@ function analyze(o,vars,accs,custs,builds){
         r.items.push({ty:"variante",raw:n,sp:p,ic:bv.ic,dc:delta,bc:bv.bc,mg:margin,ep:bv.ep,mt:`${bv.t}: ${bv.v}`,lg:bv.l==="A"?"Additiva":"Sostitutiva",cf:"alto"});continue;}
       if(p===0){r.items.push({ty:"variante",raw:n,sp:0,ic:null,dc:0,bc:null,mg:0,ep:0,mt:"Opzione base (gratuita)",lg:"Sostitutiva",cf:"medio"});continue;}
       r.items.push({ty:"sconosciuto",raw:n,sp:p,ic:null,dc:null,bc:null,mg:null,ep:p,mt:null,lg:"—",cf:"nessuno"});r.anom.push({ty:"variante_sconosciuta",it:n,sv:"alto"});r.st="parziale";continue;}
-    if((nn.includes("27")&&(nn.includes("WQHD")||nn.includes("2K")||nn.includes("2560")))||nn.includes("Q27")){const a=accs.find(x=>x.k==="MONITOR_27_2K")||accs[4];tc+=a.ic;r.items.push({ty:"accessorio",raw:n,sp:p,ic:a.ic,dc:a.ic,bc:0,mg:a.sp-a.ic,ep:a.sp,mt:a.nm,lg:"Additiva",cf:"alto"});continue;}
-    if(nn.includes("24")&&(nn.includes("180")||nn.includes("1MS"))){const a=accs.find(x=>x.k==="MONITOR_24_180")||accs[3];tc+=a.ic;r.items.push({ty:"accessorio",raw:n,sp:p,ic:a.ic,dc:a.ic,bc:0,mg:a.sp-a.ic,ep:a.sp,mt:a.nm,lg:"Additiva",cf:"alto"});continue;}
-    if(nn.includes("KIT")&&nn.includes("4IN1")){const a=accs.find(x=>x.k==="KIT_4IN1")||accs[0];tc+=a.ic;r.items.push({ty:"accessorio",raw:n,sp:p,ic:a.ic,dc:a.ic,bc:0,mg:a.sp-a.ic,ep:a.sp,mt:a.nm,lg:"Additiva",cf:"alto"});continue;}
-    if(nn.includes("G61")){const a=accs.find(x=>x.k==="G61_SET")||accs[1];tc+=a.ic;r.items.push({ty:"accessorio",raw:n,sp:p,ic:a.ic,dc:a.ic,bc:0,mg:a.sp-a.ic,ep:a.sp,mt:a.nm,lg:"Additiva",cf:"alto"});continue;}
-    if(nn.includes("M96")){const a=accs.find(x=>x.k==="M96_PRO_SET")||accs[2];tc+=a.ic;r.items.push({ty:"accessorio",raw:n,sp:p,ic:a.ic,dc:a.ic,bc:0,mg:a.sp-a.ic,ep:a.sp,mt:a.nm,lg:"Additiva",cf:"alto"});continue;}
+    if((nn.includes("27")&&(nn.includes("WQHD")||nn.includes("2K")||nn.includes("2560")))||nn.includes("Q27")){const a=accs.find(x=>x.k==="MONITOR_27_2K")||(accs[4]||{k:"MONITOR_27_2K",nm:"MONITOR 27 2K",sp:249,ic:149});tc+=a.ic;r.items.push({ty:"accessorio",raw:n,sp:p,ic:a.ic,dc:a.ic,bc:0,mg:a.sp-a.ic,ep:a.sp,mt:a.nm,lg:"Additiva",cf:"alto"});continue;}
+    if(nn.includes("24")&&(nn.includes("180")||nn.includes("1MS"))){const a=accs.find(x=>x.k==="MONITOR_24_180")||(accs[3]||{k:"MONITOR_24_180",nm:"MONITOR 24 180HZ",sp:199,ic:89});tc+=a.ic;r.items.push({ty:"accessorio",raw:n,sp:p,ic:a.ic,dc:a.ic,bc:0,mg:a.sp-a.ic,ep:a.sp,mt:a.nm,lg:"Additiva",cf:"alto"});continue;}
+    if(nn.includes("KIT")&&nn.includes("4IN1")){const a=accs.find(x=>x.k==="KIT_4IN1")||(accs[0]||{k:"KIT_4IN1",nm:"KIT GAMING 4IN1",sp:99,ic:40});tc+=a.ic;r.items.push({ty:"accessorio",raw:n,sp:p,ic:a.ic,dc:a.ic,bc:0,mg:a.sp-a.ic,ep:a.sp,mt:a.nm,lg:"Additiva",cf:"alto"});continue;}
+    if(nn.includes("G61")){const a=accs.find(x=>x.k==="G61_SET")||(accs[1]||{k:"G61_SET",nm:"G61 SET",sp:99,ic:60});tc+=a.ic;r.items.push({ty:"accessorio",raw:n,sp:p,ic:a.ic,dc:a.ic,bc:0,mg:a.sp-a.ic,ep:a.sp,mt:a.nm,lg:"Additiva",cf:"alto"});continue;}
+    if(nn.includes("M96")){const a=accs.find(x=>x.k==="M96_PRO_SET")||(accs[2]||{k:"M96_PRO_SET",nm:"M96 PRO SET",sp:179,ic:60});tc+=a.ic;r.items.push({ty:"accessorio",raw:n,sp:p,ic:a.ic,dc:a.ic,bc:0,mg:a.sp-a.ic,ep:a.sp,mt:a.nm,lg:"Additiva",cf:"alto"});continue;}
     r.items.push({ty:"sconosciuto",raw:n,sp:p,ic:null,dc:null,bc:null,mg:null,ep:p,mt:null,lg:"—",cf:"nessuno"});r.anom.push({ty:"item_sconosciuto",it:n,sv:"medio"});if(r.st==="completo")r.st="parziale";}
   if(!bb&&!cb){r.st="non_riconosciuto";r.anom.push({ty:"build_assente",it:"Nessuna build identificata",sv:"critico"});}
   const asm=liq?S.aLiq:S.aStd;const fees=o.tot*S.feeR;const netR=o.tot/1.22,netC=tc/1.22;const preTax=netR-netC-fees-asm-S.ship;const taxes=preTax*S.taxR,postTax=preTax-taxes;const vatS=o.tot-(o.tot/1.22);const ordV=tc-cpu17;const dedV=ordV-(ordV/1.22);const vatA=vatS-dedV;
@@ -296,68 +296,27 @@ function App(){
   const savLocal=function(k,d){try{localStorage.setItem(k,JSON.stringify(d));}catch(e){}};
   const ldLocal=function(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}};
 
-  // Caricamento iniziale: Supabase per strutture + localStorage per dati operativi se Supabase è vuoto
+  // Caricamento iniziale: localStorage + Supabase per nuovi dati
   useEffect(function(){
-    let done=false;
-    const load=async function(){
-      // Sempre carica localStorage come base
-      var localAds=ldLocal("mg-ads")||[];
-      var localSpese=ldLocal("mg-spese")||[];
-      var localManual=ldLocal("mg-manual")||[];
-      var localOrders=ldLocal("mg-orders")||[];
-      
-      try{
-        // Prova Supabase per le strutture (build, varianti, accessori, abbonamenti)
-        const r=await fetch("/api/db?action=load_all",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
-        if(r.ok){
-          const db=await r.json();
-          if(done)return;
-          // Strutture da Supabase (queste sono sempre aggiornate su Supabase)
-          if(db.variants&&db.variants.length>0)setVars(db.variants.map(function(v){return{t:v.type,v:v.name,ep:parseFloat(v.extra_price)||0,l:v.logic||"S",ic:v.internal_cost!=null?parseFloat(v.internal_cost):null,bc:parseFloat(v.base_cost)||0,g:v.build_groups||"*",_id:v.id};}));
-          if(db.accessories&&db.accessories.length>0)setAccs(db.accessories.map(function(a){return{k:a.key,nm:a.name,sp:parseFloat(a.sell_price)||0,ic:parseFloat(a.internal_cost)||0,_id:a.id};}));
-          if(db.customBuilds&&db.customBuilds.length>0)setCusts(db.customBuilds.map(function(c){return{sm:c.shopify_match,inn:c.internal_name,a17:c.has_art17,tc:parseFloat(c.total_cost)||0,ca:parseFloat(c.cpu_art17)||0,at:c.assembly_type||"ASSASSIN",_id:c.id};}));
-          if(db.builds&&db.builds.length>0)setBuilds(db.builds.map(function(b){return{n:b.name,c:parseFloat(b.cost_iva)||0,p:parseFloat(b.price)||0,cpu:parseFloat(b.cpu_art17)||0,_id:b.id};}));
-          if(db.subscriptions&&db.subscriptions.length>0)setAbbon(db.subscriptions.map(function(s){return{nome:s.name,costo:parseFloat(s.cost)||0,valuta:s.currency||"EUR",freq:s.frequency||"mese",_id:s.id};}));
-          if(db.settings){
-            var usd=db.settings.find(function(s){return s.key==="usd_rate";});
-            if(usd)setUsdRate(parseFloat(usd.value)||0.92);
-          }
-          // Dati operativi: Supabase se ha dati, altrimenti localStorage
-          if(db.adsLog&&db.adsLog.length>0)setAdsLog(db.adsLog.map(function(a){return{date:a.date,tiktok:parseFloat(a.tiktok)||0,meta:parseFloat(a.meta)||0,_id:a.id};}));
-          else if(localAds.length>0)setAdsLog(localAds);
-          
-          if(db.expenses&&db.expenses.length>0)setSpeseLog(db.expenses.map(function(s){return{date:s.date,desc:s.description,importo:parseFloat(s.amount)||0,iva:s.has_iva,_id:s.id};}));
-          else if(localSpese.length>0)setSpeseLog(localSpese);
-          
-          if(db.manualOrders&&db.manualOrders.length>0)setManualOrders(db.manualOrders.map(function(m){return{date:m.date,desc:m.description,incasso:parseFloat(m.income)||0,ivaV:m.iva_rate||22,costo:parseFloat(m.product_cost)||0,cpu17:parseFloat(m.cpu_art17)||0,_id:m.id};}));
-          else if(localManual.length>0)setManualOrders(localManual);
-          
-          // Ordini: dalla cache Supabase o localStorage
-          if(db.orders&&db.orders.length>0)setAnaList(db.orders.map(function(o){return o.analysis;}));
-          else if(localOrders.length>0)setAnaList(localOrders);
-          
-          if(!done)setLoading(false);
-          return;
-        }
-      }catch(e){/* Supabase non disponibile */}
-      // Fallback completo: solo localStorage
-      if(done)return;
-      var v=ldLocal("mg-vars"),a=ldLocal("mg-accs"),c=ldLocal("mg-custs"),b=ldLocal("mg-builds"),ab=ldLocal("mg-abbon"),us=ldLocal("mg-usd");
+    var done=false;
+    try{
+      // Carica da localStorage (funziona sempre)
+      var v=ldLocal("mg-vars"),a=ldLocal("mg-accs"),c=ldLocal("mg-custs"),b=ldLocal("mg-builds");
+      var o=ldLocal("mg-orders"),ad=ldLocal("mg-ads"),sp=ldLocal("mg-spese"),mo=ldLocal("mg-manual");
+      var ab=ldLocal("mg-abbon"),us=ldLocal("mg-usd");
       if(v&&Array.isArray(v))setVars(v);
       if(a&&Array.isArray(a))setAccs(a);
       if(c&&Array.isArray(c))setCusts(c);
       if(b&&Array.isArray(b))setBuilds(b);
-      if(localOrders.length>0)setAnaList(localOrders);
-      if(localAds.length>0)setAdsLog(localAds);
-      if(localSpese.length>0)setSpeseLog(localSpese);
-      if(localManual.length>0)setManualOrders(localManual);
+      if(o&&Array.isArray(o)&&o.length>0)setAnaList(o);
+      if(ad&&Array.isArray(ad))setAdsLog(ad);
+      if(sp&&Array.isArray(sp))setSpeseLog(sp);
+      if(mo&&Array.isArray(mo))setManualOrders(mo);
       if(ab&&Array.isArray(ab))setAbbon(ab);
       if(us&&typeof us==="number")setUsdRate(us);
-      if(!done)setLoading(false);
-    };
-    var timer=setTimeout(function(){if(!done){done=true;setLoading(false);}},5000);
-    load().finally(function(){done=true;clearTimeout(timer);});
-    return function(){done=true;clearTimeout(timer);};
+    }catch(e){}
+    setLoading(false);
+    return function(){done=true;};
   },[]);
 
   // Salvataggio locale come backup
