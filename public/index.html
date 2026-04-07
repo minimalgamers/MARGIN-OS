@@ -245,37 +245,44 @@ function App(){
   const [moCosto,setMoCosto]=useState("");const [moCpu,setMoCpu]=useState("");
   const [syncSt,setSyncSt]=useState(null);const [syncing,setSyncing]=useState(false);
 
+  // Fetch con retry automatico: se 401, riprova (il backend rigenera il token)
+  const fetchOrders=async function(){
+    const r1=await fetch("/api/orders?limit=250");
+    if(r1.ok)return r1.json();
+    // Se 401, riprova — il backend ha rigenerato il token
+    if(r1.status===401){
+      const r2=await fetch("/api/orders?limit=250");
+      if(r2.ok)return r2.json();
+      const e2=await r2.json();
+      throw new Error(e2.error||"Token refresh fallito");
+    }
+    const e1=await r1.json();
+    throw new Error(e1.error||"HTTP "+r1.status);
+  };
+
   // Shopify Sync
   const syncShopify=async()=>{
     setSyncing(true);setSyncSt(null);
     try{
-      const pwd=localStorage.getItem("mg-pwd")||"";
-      const r=await fetch("/api/orders?limit=250",{headers:pwd?{"Authorization":`Bearer ${pwd}`}:{}});
-      if(!r.ok){const e=await r.json();throw new Error(e.error||`HTTP ${r.status}`);}
-      const data=await r.json();
+      const data=await fetchOrders();
       if(!data.orders||!data.orders.length){setSyncSt({ok:true,msg:"Nessun nuovo ordine trovato"});setSyncing(false);return;}
       const newAna=data.orders.map(o=>analyze(o,vars,accs,custs,builds));
       const existing=new Set(anaList.map(a=>a.on));
       const fresh=newAna.filter(a=>!existing.has(a.on));
       const dupes=newAna.length-fresh.length;
       if(fresh.length>0)setAnaList(prev=>[...fresh,...prev]);
-      setSyncSt({ok:true,msg:`${fresh.length} nuovi ordini sincronizzati da Shopify${dupes>0?` (${dupes} già presenti)`:""}`});
+      setSyncSt({ok:true,msg:fresh.length+" nuovi ordini sincronizzati"+(dupes>0?" ("+dupes+" già presenti)":"")+(data.tokenRefreshed?" [token auto-rigenerato]":"")});
     }catch(e){setSyncSt({ok:false,msg:"Errore: "+e.message});}
     setSyncing(false);
   };
   // Ri-sincronizza tutto: cancella ordini vecchi e riscarica da Shopify
   const resyncAll=async()=>{
-    if(!confirm("Cancellare tutti gli ordini e ri-sincronizzare da Shopify?\n\nI dati ADS, spese extra e ordini manuali NON verranno cancellati."))return;
     setSyncing(true);setSyncSt(null);
     try{
-      const pwd=localStorage.getItem("mg-pwd")||"";
-      const r=await fetch("/api/orders?limit=250",{headers:pwd?{"Authorization":`Bearer ${pwd}`}:{}});
-      if(!r.ok){const e=await r.json();throw new Error(e.error||`HTTP ${r.status}`);}
-      const data=await r.json();
-      if(!data.orders||!data.orders.length){setAnaList([]);setSyncSt({ok:true,msg:"Ordini cancellati. Nessun ordine trovato su Shopify."});setSyncing(false);return;}
-      const newAna=data.orders.map(o=>analyze(o,vars,accs,custs,builds));
+      const data=await fetchOrders();
+      const newAna=(data.orders||[]).map(o=>analyze(o,vars,accs,custs,builds));
       setAnaList(newAna);
-      setSyncSt({ok:true,msg:`✓ Tutti gli ordini ri-analizzati da zero: ${newAna.length} ordini caricati`});
+      setSyncSt({ok:true,msg:"Ri-sincronizzati "+newAna.length+" ordini da zero"+(data.tokenRefreshed?" [token auto-rigenerato]":"")});
     }catch(e){setSyncSt({ok:false,msg:"Errore: "+e.message});}
     setSyncing(false);
   };
@@ -328,11 +335,7 @@ function App(){
   useEffect(function(){
     if(loading||autoSynced)return;
     setAutoSynced(true);
-    // Prova a sincronizzare da Shopify (silenzioso, senza errori visibili)
-    fetch("/api/orders?limit=250").then(function(r){
-      if(!r.ok)return null;
-      return r.json();
-    }).then(function(data){
+    fetchOrders().then(function(data){
       if(!data||!data.orders||!data.orders.length)return;
       setAnaList(function(prev){
         const existing=new Set(prev.map(function(a){return a.on;}));
@@ -341,7 +344,7 @@ function App(){
         const newAna=fresh.map(function(o){return analyze(o,vars,accs,custs,builds);});
         return[...newAna,...prev];
       });
-    }).catch(function(){/* silenzioso — su Claude artifact non c'è l'API */});
+    }).catch(function(){/* silenzioso */});
   },[loading,autoSynced]);
 
   // Filtro per data
