@@ -287,15 +287,50 @@ function App(){
     setSyncing(false);
   };
 
-  // ═══ PERSISTENT STORAGE (localStorage) ═══
-  const sav=async(k,d)=>{try{localStorage.setItem(k,JSON.stringify(d));}catch(e){}};
-  const ld=async(k)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}};
-  useEffect(()=>{
+  // ═══ PERSISTENT STORAGE — Supabase con fallback localStorage ═══
+  const dbCall=async function(action, body){
+    const r=await fetch("/api/db?action="+action,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})});
+    if(!r.ok){const e=await r.json().catch(function(){return{error:"HTTP "+r.status}});throw new Error(e.error||"DB error");}
+    return r.json();
+  };
+  const savLocal=function(k,d){try{localStorage.setItem(k,JSON.stringify(d));}catch(e){}};
+  const ldLocal=function(k){try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch(e){return null;}};
+
+  // Caricamento iniziale: prova Supabase, fallback localStorage
+  useEffect(function(){
     let done=false;
-    const load=async()=>{
+    const load=async function(){
+      try{
+        // Prova Supabase
+        const r=await fetch("/api/db?action=load_all",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+        if(r.ok){
+          const db=await r.json();
+          if(done)return;
+          // Converti dati Supabase nel formato frontend
+          if(db.variants&&db.variants.length>0)setVars(db.variants.map(function(v){return{t:v.type,v:v.name,ep:parseFloat(v.extra_price)||0,l:v.logic||"S",ic:v.internal_cost!=null?parseFloat(v.internal_cost):null,bc:parseFloat(v.base_cost)||0,g:v.build_groups||"*",_id:v.id};}));
+          if(db.accessories&&db.accessories.length>0)setAccs(db.accessories.map(function(a){return{k:a.key,nm:a.name,sp:parseFloat(a.sell_price)||0,ic:parseFloat(a.internal_cost)||0,_id:a.id};}));
+          if(db.customBuilds&&db.customBuilds.length>0)setCusts(db.customBuilds.map(function(c){return{sm:c.shopify_match,inn:c.internal_name,a17:c.has_art17,tc:parseFloat(c.total_cost)||0,ca:parseFloat(c.cpu_art17)||0,at:c.assembly_type||"ASSASSIN",_id:c.id};}));
+          if(db.builds&&db.builds.length>0)setBuilds(db.builds.map(function(b){return{n:b.name,c:parseFloat(b.cost_iva)||0,p:parseFloat(b.price)||0,cpu:parseFloat(b.cpu_art17)||0,_id:b.id};}));
+          if(db.adsLog&&db.adsLog.length>0)setAdsLog(db.adsLog.map(function(a){return{date:a.date,tiktok:parseFloat(a.tiktok)||0,meta:parseFloat(a.meta)||0,_id:a.id};}));
+          if(db.expenses&&db.expenses.length>0)setSpeseLog(db.expenses.map(function(s){return{date:s.date,desc:s.description,importo:parseFloat(s.amount)||0,iva:s.has_iva,_id:s.id};}));
+          if(db.manualOrders&&db.manualOrders.length>0)setManualOrders(db.manualOrders.map(function(m){return{date:m.date,desc:m.description,incasso:parseFloat(m.income)||0,ivaV:m.iva_rate||22,costo:parseFloat(m.product_cost)||0,cpu17:parseFloat(m.cpu_art17)||0,_id:m.id};}));
+          if(db.subscriptions&&db.subscriptions.length>0)setAbbon(db.subscriptions.map(function(s){return{nome:s.name,costo:parseFloat(s.cost)||0,valuta:s.currency||"EUR",freq:s.frequency||"mese",_id:s.id};}));
+          if(db.settings){
+            const usd=db.settings.find(function(s){return s.key==="usd_rate";});
+            if(usd)setUsdRate(parseFloat(usd.value)||0.92);
+          }
+          // Ordini dalla cache Supabase
+          if(db.orders&&db.orders.length>0){
+            setAnaList(db.orders.map(function(o){return o.analysis;}));
+          }
+          if(!done)setLoading(false);
+          return;
+        }
+      }catch(e){/* Supabase non disponibile, fallback localStorage */}
+      // Fallback: localStorage
       try{
         const keys=["mg-vars","mg-accs","mg-custs","mg-builds","mg-orders","mg-ads","mg-spese","mg-manual","mg-abbon","mg-usd"];
-        const results=await Promise.all(keys.map(ld));
+        const results=keys.map(ldLocal);
         if(done)return;
         const [v,a,c,b,o,ad,sp,mo,ab,us]=results;
         if(v&&Array.isArray(v))setVars(v);
@@ -303,34 +338,26 @@ function App(){
         if(c&&Array.isArray(c))setCusts(c);
         if(b&&Array.isArray(b))setBuilds(b);
         if(o&&Array.isArray(o)&&o.length>0)setAnaList(o);
-        else setAnaList([]);
         if(ad&&Array.isArray(ad))setAdsLog(ad);
         if(sp&&Array.isArray(sp))setSpeseLog(sp);
         if(mo&&Array.isArray(mo))setManualOrders(mo);
         if(ab&&Array.isArray(ab))setAbbon(ab);
         if(us&&typeof us==="number")setUsdRate(us);
-      }catch(e){
-        if(!done)setAnaList([]);
-      }
+      }catch(e){}
       if(!done)setLoading(false);
     };
-    // Timeout: se il caricamento dura troppo, vai avanti con i default
-    const timer=setTimeout(()=>{if(!done){done=true;setAnaList([]);setLoading(false);}},3000);
-    load().finally(()=>{done=true;clearTimeout(timer);});
-    return()=>{done=true;clearTimeout(timer);};
+    const timer=setTimeout(function(){if(!done){done=true;setLoading(false);}},5000);
+    load().finally(function(){done=true;clearTimeout(timer);});
+    return function(){done=true;clearTimeout(timer);};
   },[]);
-  useEffect(()=>{if(!loading)sav("mg-vars",vars);},[vars,loading]);
-  useEffect(()=>{if(!loading)sav("mg-accs",accs);},[accs,loading]);
-  useEffect(()=>{if(!loading)sav("mg-custs",custs);},[custs,loading]);
-  useEffect(()=>{if(!loading)sav("mg-builds",builds);},[builds,loading]);
-  useEffect(()=>{if(!loading)sav("mg-orders",anaList);},[anaList,loading]);
-  useEffect(()=>{if(!loading)sav("mg-ads",adsLog);},[adsLog,loading]);
-  useEffect(()=>{if(!loading)sav("mg-spese",speseLog);},[speseLog,loading]);
-  useEffect(()=>{if(!loading)sav("mg-manual",manualOrders);},[manualOrders,loading]);
-  useEffect(()=>{if(!loading)sav("mg-abbon",abbon);},[abbon,loading]);
-  useEffect(()=>{if(!loading)sav("mg-usd",usdRate);},[usdRate,loading]);
 
-  // Auto-sync: quando l'app finisce di caricare, sincronizza in background da Shopify
+  // Salvataggio locale come backup
+  useEffect(function(){if(!loading)savLocal("mg-ads",adsLog);},[adsLog,loading]);
+  useEffect(function(){if(!loading)savLocal("mg-spese",speseLog);},[speseLog,loading]);
+  useEffect(function(){if(!loading)savLocal("mg-manual",manualOrders);},[manualOrders,loading]);
+  useEffect(function(){if(!loading)savLocal("mg-orders",anaList);},[anaList,loading]);
+
+  // Auto-sync Shopify
   const [autoSynced,setAutoSynced]=useState(false);
   useEffect(function(){
     if(loading||autoSynced)return;
@@ -344,7 +371,7 @@ function App(){
         const newAna=fresh.map(function(o){return analyze(o,vars,accs,custs,builds);});
         return[...newAna,...prev];
       });
-    }).catch(function(){/* silenzioso */});
+    }).catch(function(){});
   },[loading,autoSynced]);
 
   // Filtro per data
@@ -364,23 +391,52 @@ function App(){
     return anaList.filter(a=>{const d=(a.dt||"").slice(0,10);return d>=from&&d<=to;});
   },[anaList,periodo,dateFrom,dateTo]);
 
-  // ADS functions
-  const saveAds=()=>{
+  // ADS functions — salva su Supabase + stato locale
+  const saveAds=function(){
     if(!adsDate)return;
     const tk=parseFloat(adsTiktok)||0, mt=parseFloat(adsMeta)||0;
     if(tk===0&&mt===0)return;
-    setAdsLog(prev=>{const existing=prev.findIndex(e=>e.date===adsDate);
+    setAdsLog(function(prev){const existing=prev.findIndex(function(e){return e.date===adsDate;});
       if(existing>=0){const n=[...prev];n[existing]={date:adsDate,tiktok:tk,meta:mt};return n;}
-      return[...prev,{date:adsDate,tiktok:tk,meta:mt}].sort((a,b)=>b.date.localeCompare(a.date));});
+      return[...prev,{date:adsDate,tiktok:tk,meta:mt}].sort(function(a,b){return b.date.localeCompare(a.date);});});
     setAdsTiktok("");setAdsMeta("");
+    // Salva su Supabase in background
+    dbCall("ads_upsert",{date:adsDate,tiktok:tk,meta:mt}).catch(function(){});
   };
-  const deleteAds=(date)=>setAdsLog(prev=>prev.filter(e=>e.date!==date));
+  const deleteAds=function(date){
+    setAdsLog(function(prev){return prev.filter(function(e){return e.date!==date;});});
+    dbCall("ads_delete",{date:date}).catch(function(){});
+  };
   // Spese extra
-  const saveSpesa=()=>{const imp=parseFloat(spImporto)||0;if(!spDesc.trim()||!imp)return;setSpeseLog(prev=>[{date:spData,desc:spDesc,importo:imp,iva:spIva},...prev]);setSpDesc("");setSpImporto("");};
-  const deleteSpesa=i=>setSpeseLog(prev=>prev.filter((_,j)=>j!==i));
+  const saveSpesa=function(){
+    const imp=parseFloat(spImporto)||0;if(!spDesc.trim()||!imp)return;
+    const newSpesa={date:spData,desc:spDesc,importo:imp,iva:spIva};
+    setSpeseLog(function(prev){return[newSpesa,...prev];});
+    setSpDesc("");setSpImporto("");
+    dbCall("expense_add",{date:spData,description:spDesc,amount:imp,has_iva:spIva}).then(function(r){
+      if(r&&r.data&&r.data[0])newSpesa._id=r.data[0].id;
+    }).catch(function(){});
+  };
+  const deleteSpesa=function(i){
+    const item=speseLog[i];
+    setSpeseLog(function(prev){return prev.filter(function(_,j){return j!==i;});});
+    if(item&&item._id)dbCall("expense_delete",{id:item._id}).catch(function(){});
+  };
   // Ordini manuali
-  const saveManual=()=>{const inc=parseFloat(moIncasso)||0;if(!moDesc.trim()||!inc)return;setManualOrders(prev=>[{date:moData,desc:moDesc,incasso:inc,ivaV:moIvaV,costo:parseFloat(moCosto)||0,cpu17:parseFloat(moCpu)||0},...prev]);setMoDesc("");setMoIncasso("");setMoCosto("");setMoCpu("");};
-  const deleteManual=i=>setManualOrders(prev=>prev.filter((_,j)=>j!==i));
+  const saveManual=function(){
+    const inc=parseFloat(moIncasso)||0;if(!moDesc.trim()||!inc)return;
+    const newMo={date:moData,desc:moDesc,incasso:inc,ivaV:moIvaV,costo:parseFloat(moCosto)||0,cpu17:parseFloat(moCpu)||0};
+    setManualOrders(function(prev){return[newMo,...prev];});
+    setMoDesc("");setMoIncasso("");setMoCosto("");setMoCpu("");
+    dbCall("manual_add",{date:moData,description:moDesc,income:inc,iva_rate:moIvaV,product_cost:parseFloat(moCosto)||0,cpu_art17:parseFloat(moCpu)||0}).then(function(r){
+      if(r&&r.data&&r.data[0])newMo._id=r.data[0].id;
+    }).catch(function(){});
+  };
+  const deleteManual=function(i){
+    const item=manualOrders[i];
+    setManualOrders(function(prev){return prev.filter(function(_,j){return j!==i;});});
+    if(item&&item._id)dbCall("manual_delete",{id:item._id}).catch(function(){});
+  };
 
   // ADS filtered by period
   const filteredAds=useMemo(()=>{
@@ -466,9 +522,9 @@ function App(){
   const updateCust=(i,f,v)=>{setCusts(p=>{const n=[...p];n[i]={...n[i],[f]:v};return n;});};
   const addCust=()=>{if(!newCust.inn.trim())return;setCusts(p=>[...p,{...newCust,sm:newCust.sm||`[CUSTOM] ${newCust.inn}`}]);setNewCust({sm:"",inn:"",a17:true,tc:0,ca:0,at:"ASSASSIN"});setShowAddCust(false);};
   const deleteCust=i=>{setCusts(p=>p.filter((_,j)=>j!==i));};
-  const updateAbbon=(i,f,v)=>{setAbbon(p=>{const n=[...p];n[i]={...n[i],[f]:v};return n;});};
-  const addAbbon=()=>{if(!newAbbon.nome.trim()||!newAbbon.costo)return;setAbbon(p=>[...p,{...newAbbon}]);setNewAbbon({nome:"",costo:0,valuta:"EUR",freq:"mese"});setShowAddAbbon(false);};
-  const deleteAbbon=i=>{setAbbon(p=>p.filter((_,j)=>j!==i));};
+  const updateAbbon=function(i,f,v){setAbbon(function(p){const n=[...p];n[i]={...n[i],[f]:v};if(n[i]._id)dbCall("subscription_update",{id:n[i]._id,data:{[f==="costo"?"cost":f==="nome"?"name":f==="valuta"?"currency":f==="freq"?"frequency":f]:v}}).catch(function(){});return n;});};
+  const addAbbon=function(){if(!newAbbon.nome.trim()||!newAbbon.costo)return;const na={...newAbbon};setAbbon(function(p){return[...p,na];});setNewAbbon({nome:"",costo:0,valuta:"EUR",freq:"mese"});setShowAddAbbon(false);dbCall("subscription_add",{name:na.nome,cost:na.costo,currency:na.valuta,frequency:na.freq}).then(function(r){if(r&&r.data&&r.data[0])na._id=r.data[0].id;}).catch(function(){});};
+  const deleteAbbon=function(i){const item=abbon[i];setAbbon(function(p){return p.filter(function(_,j){return j!==i;});});if(item&&item._id)dbCall("subscription_delete",{id:item._id}).catch(function(){});};
 
   const filteredVars=vars.map((v,i)=>({...v,_i:i})).filter(v=>!dbFilter||N(v.t+v.v).includes(N(dbFilter)));
   const nav=[["dash","Dashboard"],["orders","Ordini"],["import","Sincronizza"],["db","Database"],["anom","Anomalie"]];
